@@ -4,11 +4,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+
+	"github.com/bmamha/chirpy/internal/auth"
+	"github.com/bmamha/chirpy/internal/database"
 )
 
 func (cfg *apiConfig) UserCreationHandler(w http.ResponseWriter, r *http.Request) {
 	type parameters struct {
-		Email string `json "email"`
+		Password string `json "password"`
+		Email    string `json "email"`
 	}
 	decoder := json.NewDecoder(r.Body)
 	params := parameters{}
@@ -19,8 +23,19 @@ func (cfg *apiConfig) UserCreationHandler(w http.ResponseWriter, r *http.Request
 		w.Write([]byte("\"error\": Error decoding parameters"))
 		return
 	}
-
-	user, err := cfg.db.CreateUser(r.Context(), params.Email)
+	passwordHash, err := auth.HashPassword(params.Password)
+	if err != nil {
+		fmt.Println(err)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(500)
+		w.Write([]byte("\"error\": Unable to hash password"))
+		return
+	}
+	userParams := database.CreateUserParams{
+		Email:          params.Email,
+		HashedPassword: passwordHash,
+	}
+	user, err := cfg.db.CreateUser(r.Context(), userParams)
 	if err != nil {
 		fmt.Println(err)
 		w.Header().Set("Content-Type", "application/json")
