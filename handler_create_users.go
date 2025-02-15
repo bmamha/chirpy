@@ -2,17 +2,26 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/bmamha/chirpy/internal/auth"
 	"github.com/bmamha/chirpy/internal/database"
+	"github.com/google/uuid"
 )
+
+type UserCreationResponse struct {
+	ID          uuid.UUID `json:"id"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+	Email       string    `json:"email"`
+	IsChirpyRed bool      `json:"is_chirpy_red"`
+}
 
 func (cfg *apiConfig) UserCreationHandler(w http.ResponseWriter, r *http.Request) {
 	type parameters struct {
-		Password string `json "password"`
-		Email    string `json "email"`
+		Password string `json:"password"`
+		Email    string `json:"email"`
 	}
 	decoder := json.NewDecoder(r.Body)
 	params := parameters{}
@@ -25,7 +34,6 @@ func (cfg *apiConfig) UserCreationHandler(w http.ResponseWriter, r *http.Request
 	}
 	passwordHash, err := auth.HashPassword(params.Password)
 	if err != nil {
-		fmt.Println(err)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(500)
 		w.Write([]byte("\"error\": Unable to hash password"))
@@ -37,18 +45,25 @@ func (cfg *apiConfig) UserCreationHandler(w http.ResponseWriter, r *http.Request
 	}
 	user, err := cfg.db.CreateUser(r.Context(), userParams)
 	if err != nil {
-		fmt.Println(err)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(500)
 		w.Write([]byte("\"error\": Error creating user"))
 		return
 	}
-
-	jsonResponse := fmt.Sprintf("{\"id\": \"%s\", \"created_at\": \"%s\",\"updated_at\": \"%s\",\"email\": \"%s\"}",
-		user.ID,
-		user.CreatedAt,
-		user.UpdatedAt,
-		user.Email)
+	jsonUser := UserCreationResponse{
+		ID:          user.ID,
+		CreatedAt:   user.CreatedAt,
+		UpdatedAt:   user.UpdatedAt,
+		Email:       user.Email,
+		IsChirpyRed: user.IsChirpyRed,
+	}
+	jsonResponse, err := json.Marshal(jsonUser)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(500)
+		w.Write([]byte("\"error\": Unable to parse response"))
+		return
+	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(201)
 	w.Write([]byte(jsonResponse))

@@ -8,4 +8,3 @@ email TEXT NOT NULL UNIQUE
 DROP TABLE users; 
 
 
-

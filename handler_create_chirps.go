@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/bmamha/chirpy/internal/auth"
 	"github.com/bmamha/chirpy/internal/database"
-	"github.com/google/uuid"
 )
 
 func (cfg *apiConfig) ChirpCreationHandler(w http.ResponseWriter, r *http.Request) {
@@ -15,9 +15,25 @@ func (cfg *apiConfig) ChirpCreationHandler(w http.ResponseWriter, r *http.Reques
 		UserID string `json:"user_id"`
 	}
 
+	token, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		fmt.Println(err)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(401)
+		w.Write([]byte("\"error\": Error obtaining token"))
+		return
+	}
+	userid, err := auth.ValidateJWT(token, cfg.SECRET)
+	if err != nil {
+		fmt.Println(err)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(401)
+		w.Write([]byte("\"error\": Unauthorized"))
+		return
+	}
 	decoder := json.NewDecoder(r.Body)
 	params := parameters{}
-	err := decoder.Decode(&params)
+	err = decoder.Decode(&params)
 	if err != nil {
 		fmt.Println(err)
 		w.Header().Set("Content-Type", "application/json")
@@ -35,13 +51,6 @@ func (cfg *apiConfig) ChirpCreationHandler(w http.ResponseWriter, r *http.Reques
 
 	cleaned_body := badWordsHandler(params.Body)
 
-	userid, err := uuid.Parse(params.UserID)
-	if err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(400)
-		w.Write([]byte("\"error\": Failed to parse id given"))
-		return
-	}
 	chirpParameters := database.CreateChirpsParams{
 		Body:   cleaned_body,
 		UserID: userid,

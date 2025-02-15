@@ -2,24 +2,30 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/bmamha/chirpy/internal/auth"
+
+	"github.com/bmamha/chirpy/internal/database"
 	"github.com/google/uuid"
 )
 
 type UserResponse struct {
-	ID        uuid.UUID `json:"id"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-	Email     string    `json:"email"`
+	ID           uuid.UUID `json:"id"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
+	Email        string    `json:"email"`
+	IsChirpyRed  bool      `json:"is_chirpy_red"`
+	Token        string    `json:"token"`
+	RefreshToken string    `json:"refresh_token"`
 }
 
 func (cfg *apiConfig) loginHandler(w http.ResponseWriter, r *http.Request) {
 	type parameters struct {
-		Password string `json "password"`
-		Email    string `json "email"`
+		Password string `json:"password"`
+		Email    string `json:"email"`
 	}
 
 	decoder := json.NewDecoder(r.Body)
@@ -47,12 +53,47 @@ func (cfg *apiConfig) loginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	jsonUser := UserResponse{
-		ID:        user.ID,
-		CreatedAt: user.CreatedAt,
-		UpdatedAt: user.UpdatedAt,
-		Email:     user.Email,
+	tokenString, err := auth.MakeJWT(user.ID, cfg.SECRET)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(401)
+		w.Write([]byte("\"error\":\"Unable to generate token for user\""))
+		return
+
 	}
+
+	refreshToken, err := auth.MakeRefreshToken()
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(401)
+		w.Write([]byte("\"error\":\"Unable to generate token for user\""))
+		return
+	}
+
+	jsonUser := UserResponse{
+		ID:           user.ID,
+		CreatedAt:    user.CreatedAt,
+		UpdatedAt:    user.UpdatedAt,
+		Email:        user.Email,
+		IsChirpyRed:  user.IsChirpyRed,
+		Token:        tokenString,
+		RefreshToken: refreshToken,
+	}
+	expireTime := time.Now().AddDate(0, 0, 60)
+	Refresh, err := cfg.db.CreateRefreshTokens(r.Context(), database.CreateRefreshTokensParams{
+		Token:     refreshToken,
+		UserID:    user.ID,
+		ExpiresAt: expireTime,
+	})
+	if err != nil {
+		fmt.Println(Refresh, err)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(500)
+		w.Write([]byte("\"error\": Unable to create refresh token"))
+		return
+
+	}
+
 	jsonResponse, err := json.Marshal(jsonUser)
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")

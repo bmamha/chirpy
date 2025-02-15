@@ -18,6 +18,8 @@ type apiConfig struct {
 	fileServerHits atomic.Int32
 	db             *database.Queries
 	PLATFORM       string
+	SECRET         string
+	POLKA_KEY      string
 }
 
 func main() {
@@ -42,7 +44,12 @@ func main() {
 		WriteTimeout:   10 * time.Second,
 		MaxHeaderBytes: 1 << 20,
 	}
-	apiCfg := &apiConfig{db: dbQueries, PLATFORM: os.Getenv("PLATFORM")}
+	apiCfg := &apiConfig{
+		db:        dbQueries,
+		PLATFORM:  os.Getenv("PLATFORM"),
+		SECRET:    os.Getenv("SECRET"),
+		POLKA_KEY: os.Getenv("POLKA_KEY"),
+	}
 
 	fileServer := http.FileServer(http.Dir(directoryPath))
 	handler := http.StripPrefix("/app", fileServer)
@@ -56,5 +63,10 @@ func main() {
 	mux.HandleFunc("POST /api/chirps", apiCfg.ChirpCreationHandler)
 	mux.HandleFunc("GET /api/chirps/{chirpID}", apiCfg.GetChirpHandler)
 	mux.HandleFunc("POST /api/login", apiCfg.loginHandler)
+	mux.HandleFunc("POST /api/refresh", apiCfg.refreshHandler)
+	mux.HandleFunc("POST /api/revoke", apiCfg.revokeHandler)
+	mux.HandleFunc("PUT /api/users", apiCfg.userUpdateHandler)
+	mux.HandleFunc("DELETE /api/chirps/{chirpID}", apiCfg.ChirpDeletionHandler)
+	mux.HandleFunc("POST /api/polka/webhooks", apiCfg.userUpgradeChirpyRed)
 	log.Fatal(s.ListenAndServe())
 }
