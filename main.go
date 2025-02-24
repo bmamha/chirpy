@@ -32,10 +32,6 @@ func main() {
 	dbQueries := database.New(db)
 
 	directoryPath := "."
-	_, err = os.Stat(directoryPath)
-	if os.IsNotExist(err) {
-		fmt.Printf("Directory %s not found.\n", directoryPath)
-	}
 	mux := http.NewServeMux()
 	s := &http.Server{
 		Addr:           ":8080",
@@ -51,10 +47,10 @@ func main() {
 		POLKA_KEY: os.Getenv("POLKA_KEY"),
 	}
 
-	fileServer := http.FileServer(http.Dir(directoryPath))
-	handler := http.StripPrefix("/app", fileServer)
+	filehandler := http.FileServer(http.Dir(directoryPath))
+	//	fsHandler := apiCfg.middleWareMetricsInc(http.StripPrefix("/app", http.FileServer(http.Dir(directoryPath))))
 
-	mux.Handle("/app/", apiCfg.middleWareMetricsInc(handler))
+	mux.Handle("/", apiCfg.middleWareMetricsInc(filehandler))
 	mux.HandleFunc("GET /api/healthz", ReadinessHandler)
 	mux.HandleFunc("GET /admin/metrics", apiCfg.MetricsHandler)
 	mux.HandleFunc("POST /admin/reset", apiCfg.ResetHandler)
