@@ -31,10 +31,13 @@ func main() {
 	}
 	dbQueries := database.New(db)
 
-	directoryPath := "."
+	directoryPath := http.Dir(".")
+	port := os.Getenv("PORT")
+	addr := fmt.Sprintf(":%s", port)
+
 	mux := http.NewServeMux()
 	s := &http.Server{
-		Addr:           ":8080",
+		Addr:           addr,
 		Handler:        mux,
 		ReadTimeout:    10 * time.Second,
 		WriteTimeout:   10 * time.Second,
@@ -47,10 +50,9 @@ func main() {
 		POLKA_KEY: os.Getenv("POLKA_KEY"),
 	}
 
-	filehandler := http.FileServer(http.Dir(directoryPath))
 	//	fsHandler := apiCfg.middleWareMetricsInc(http.StripPrefix("/app", http.FileServer(http.Dir(directoryPath))))
 
-	mux.Handle("/", apiCfg.middleWareMetricsInc(filehandler))
+	mux.Handle("/", apiCfg.middleWareMetricsInc(http.FileServer(directoryPath)))
 	mux.HandleFunc("GET /api/healthz", ReadinessHandler)
 	mux.HandleFunc("GET /admin/metrics", apiCfg.MetricsHandler)
 	mux.HandleFunc("POST /admin/reset", apiCfg.ResetHandler)
